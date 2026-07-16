@@ -155,6 +155,12 @@ EXECUTABLES=(
   "$SKILL_DIR/scripts/doctor"
   "$SKILL_DIR/scripts/protocol.py"
 )
+REPOSITORY_ROOT="$(cd "$SKILL_DIR/../.." 2>/dev/null && pwd -P || true)"
+for optional in install.sh doctor.sh scripts/validate-package.py; do
+  if [[ -n "$REPOSITORY_ROOT" && -f "$REPOSITORY_ROOT/$optional" ]]; then
+    EXECUTABLES+=("$REPOSITORY_ROOT/$optional")
+  fi
+done
 for resource in "${EXECUTABLES[@]}"; do
   [[ -f "$resource" ]] || { printf 'error: missing executable resource: %s\n' "$resource" >&2; exit 1; }
   if [[ ! -x "$resource" ]]; then

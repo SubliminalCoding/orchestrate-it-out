@@ -741,8 +741,15 @@ test("full controller simulation plans first, then sends exactly five exact-pane
 
 test("installer repairs stripped modes and links both skill clients without overwriting files", () => {
   const root = tempRoot();
-  const copied = path.join(root, "skill");
+  const repository = path.join(root, "repository");
+  const copied = path.join(repository, "skills", "orchestrate-it-out");
+  mkdirSync(path.dirname(copied), { recursive: true });
   cpSync(SKILL, copied, { recursive: true });
+  mkdirSync(path.join(repository, "scripts"));
+  for (const relative of ["install.sh", "doctor.sh", "scripts/validate-package.py"]) {
+    writeFileSync(path.join(repository, relative), "fixture\n");
+    chmodSync(path.join(repository, relative), 0o644);
+  }
   for (const relative of ["bin/orchestrate-it-out", "scripts/install", "scripts/doctor", "scripts/protocol.py"]) {
     chmodSync(path.join(copied, relative), 0o644);
   }
@@ -761,6 +768,9 @@ test("installer repairs stripped modes and links both skill clients without over
   assert.ok(lstatSync(path.join(codexDir, "orchestrate-it-out")).isSymbolicLink());
   assert.ok(lstatSync(path.join(binDir, "orchestrate-it-out")).isSymbolicLink());
   assert.notEqual(lstatSync(path.join(copied, "bin", "orchestrate-it-out")).mode & 0o111, 0);
+  assert.notEqual(lstatSync(path.join(repository, "install.sh")).mode & 0o111, 0);
+  assert.notEqual(lstatSync(path.join(repository, "doctor.sh")).mode & 0o111, 0);
+  assert.notEqual(lstatSync(path.join(repository, "scripts", "validate-package.py")).mode & 0o111, 0);
 
   rmSync(path.join(claudeDir, "orchestrate-it-out"));
   writeFileSync(path.join(claudeDir, "orchestrate-it-out"), "owned\n");

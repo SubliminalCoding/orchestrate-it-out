@@ -2,6 +2,11 @@
 
 All notable changes are documented here.
 
+## 0.1.1 - 2026-07-16
+
+- Repair stripped executable modes on the repository-level installer, doctor,
+  and package validator when installing from a GitHub source archive.
+
 ## 0.1.0 - 2026-07-16
 
 - Add read-only GPT-5.6 Sol planning with structured output and bounded retries.
