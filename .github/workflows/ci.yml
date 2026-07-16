@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Node ${{ matrix.node }} / Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - node: 20
+            python: "3.10"
+          - node: 22
+            python: "3.12"
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Validate package
+        run: python3 scripts/validate-package.py
+      - name: Check shell syntax
+        run: bash -n install.sh doctor.sh skills/orchestrate-it-out/bin/orchestrate-it-out skills/orchestrate-it-out/scripts/install skills/orchestrate-it-out/scripts/doctor
+      - name: Compile Python
+        run: python3 -m py_compile skills/orchestrate-it-out/scripts/protocol.py scripts/validate-package.py
+      - name: Run behavioral suite
+        run: node --test skills/orchestrate-it-out/tests/orchestrate-it-out.test.mjs
+      - name: Exercise non-mutating installer path
+        run: ./install.sh --dry-run

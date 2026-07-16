@@ -1,0 +1,179 @@
+#!/usr/bin/env bash
+# Install discovery links without overwriting user-owned files.
+set -euo pipefail
+
+REPLACE_LINKS=0
+DRY_RUN=0
+UNINSTALL=0
+
+usage() {
+  cat <<'EOF'
+Install Orchestrate It Out for Claude Code and Codex.
+
+USAGE:
+  install [--replace-links] [--dry-run]
+  install --uninstall [--dry-run]
+
+OPTIONS:
+  --replace-links  Replace existing symlinks, never files or directories
+  --dry-run        Show exact link/mode changes without making them
+  --uninstall      Remove only links owned by this checkout
+  -h, --help       Show this help
+
+Directory overrides:
+  CLAUDE_SKILLS_DIR, CODEX_SKILLS_DIR, ORCHESTRATE_IT_OUT_BIN_DIR
+EOF
+}
+
+while (($#)); do
+  case "$1" in
+    --replace-links) REPLACE_LINKS=1; shift ;;
+    --dry-run) DRY_RUN=1; shift ;;
+    --uninstall) UNINSTALL=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) printf 'error: unknown option: %s\n' "$1" >&2; exit 2 ;;
+  esac
+done
+
+canonical_path() {
+  local target="$1" directory link hops=0
+  while [[ -L "$target" ]]; do
+    ((hops += 1))
+    (( hops <= 40 )) || return 1
+    directory="$(cd -P -- "$(dirname -- "$target")" && pwd)" || return 1
+    link="$(readlink "$target")" || return 1
+    if [[ "$link" = /* ]]; then target="$link"; else target="$directory/$link"; fi
+  done
+  directory="$(cd -P -- "$(dirname -- "$target")" && pwd)" || return 1
+  printf '%s/%s\n' "$directory" "$(basename -- "$target")"
+}
+
+SCRIPT_PATH="$(canonical_path "${BASH_SOURCE[0]}")"
+SKILL_DIR="$(cd "$(dirname "$SCRIPT_PATH")/.." && pwd -P)"
+CLAUDE_SKILLS_DIR="${CLAUDE_SKILLS_DIR:-$HOME/.claude/skills}"
+CODEX_SKILLS_DIR="${CODEX_SKILLS_DIR:-${CODEX_HOME:-$HOME/.codex}/skills}"
+if [[ -n "${ORCHESTRATE_IT_OUT_BIN_DIR:-}" ]]; then
+  COMMAND_DIR="$ORCHESTRATE_IT_OUT_BIN_DIR"
+elif [[ ":${PATH:-}:" == *":$HOME/.local/bin:"* ]]; then
+  COMMAND_DIR="$HOME/.local/bin"
+else
+  COMMAND_DIR="$HOME/bin"
+fi
+
+link_resource() {
+  local source="$1" target="$2" source_path target_path
+  source_path="$(canonical_path "$source")"
+  if [[ -L "$target" ]]; then
+    target_path="$(canonical_path "$target" 2>/dev/null || true)"
+    if [[ "$target_path" == "$source_path" ]]; then
+      printf 'already linked: %s\n' "$target"
+      return
+    fi
+    if (( REPLACE_LINKS == 0 )); then
+      printf 'error: refusing to replace existing symlink: %s -> %s\n' "$target" "$(readlink "$target")" >&2
+      printf 'hint: rerun with --replace-links to migrate symlinks only\n' >&2
+      exit 1
+    fi
+    if (( DRY_RUN == 1 )); then
+      printf 'would relink: %s -> %s\n' "$target" "$source"
+    else
+      rm -- "$target"
+      ln -s "$source" "$target"
+      printf 'relinked: %s -> %s\n' "$target" "$source"
+    fi
+    return
+  fi
+  if [[ -e "$target" ]]; then
+    target_path="$(canonical_path "$target" 2>/dev/null || true)"
+    [[ "$target_path" == "$source_path" ]] && { printf 'already installed: %s\n' "$target"; return; }
+    printf 'error: refusing to replace existing file or directory: %s\n' "$target" >&2
+    exit 1
+  fi
+  if (( DRY_RUN == 1 )); then
+    printf 'would link: %s -> %s\n' "$target" "$source"
+  else
+    ln -s "$source" "$target"
+    printf 'linked: %s -> %s\n' "$target" "$source"
+  fi
+}
+
+preflight_resource() {
+  local source="$1" target="$2" source_path target_path
+  source_path="$(canonical_path "$source")"
+  if [[ -L "$target" ]]; then
+    target_path="$(canonical_path "$target" 2>/dev/null || true)"
+    [[ "$target_path" == "$source_path" || "$REPLACE_LINKS" == 1 ]] && return 0
+    printf 'error: refusing to replace existing symlink: %s -> %s\n' "$target" "$(readlink "$target")" >&2
+    return 1
+  fi
+  if [[ -e "$target" ]]; then
+    target_path="$(canonical_path "$target" 2>/dev/null || true)"
+    [[ "$target_path" == "$source_path" ]] && return 0
+    printf 'error: refusing to replace existing file or directory: %s\n' "$target" >&2
+    return 1
+  fi
+}
+
+uninstall_resource() {
+  local source="$1" target="$2" source_path target_path
+  source_path="$(canonical_path "$source")"
+  if [[ ! -L "$target" ]]; then
+    [[ -e "$target" ]] && printf 'kept non-symlink: %s\n' "$target" || printf 'not installed: %s\n' "$target"
+    return
+  fi
+  target_path="$(canonical_path "$target" 2>/dev/null || true)"
+  if [[ "$target_path" != "$source_path" ]]; then
+    printf 'kept foreign symlink: %s -> %s\n' "$target" "$(readlink "$target")"
+  elif (( DRY_RUN == 1 )); then
+    printf 'would unlink: %s\n' "$target"
+  else
+    rm -- "$target"
+    printf 'unlinked: %s\n' "$target"
+  fi
+}
+
+SOURCES=(
+  "$SKILL_DIR"
+  "$SKILL_DIR"
+  "$SKILL_DIR/bin/orchestrate-it-out"
+)
+TARGETS=(
+  "$CLAUDE_SKILLS_DIR/orchestrate-it-out"
+  "$CODEX_SKILLS_DIR/orchestrate-it-out"
+  "$COMMAND_DIR/orchestrate-it-out"
+)
+
+if (( UNINSTALL == 1 )); then
+  for index in "${!SOURCES[@]}"; do uninstall_resource "${SOURCES[$index]}" "${TARGETS[$index]}"; done
+  printf 'Orchestrate It Out links removed; checkout preserved.\n'
+  exit 0
+fi
+
+EXECUTABLES=(
+  "$SKILL_DIR/bin/orchestrate-it-out"
+  "$SKILL_DIR/scripts/install"
+  "$SKILL_DIR/scripts/doctor"
+  "$SKILL_DIR/scripts/protocol.py"
+)
+for resource in "${EXECUTABLES[@]}"; do
+  [[ -f "$resource" ]] || { printf 'error: missing executable resource: %s\n' "$resource" >&2; exit 1; }
+  if [[ ! -x "$resource" ]]; then
+    if (( DRY_RUN == 1 )); then
+      printf 'would make executable: %s\n' "$resource"
+    else
+      chmod 0755 "$resource"
+      printf 'made executable: %s\n' "$resource"
+    fi
+  fi
+done
+
+FAILED=0
+for index in "${!SOURCES[@]}"; do preflight_resource "${SOURCES[$index]}" "${TARGETS[$index]}" || FAILED=1; done
+(( FAILED == 0 )) || exit 1
+if (( DRY_RUN == 0 )); then mkdir -p "$CLAUDE_SKILLS_DIR" "$CODEX_SKILLS_DIR" "$COMMAND_DIR"; fi
+for index in "${!SOURCES[@]}"; do link_resource "${SOURCES[$index]}" "${TARGETS[$index]}"; done
+
+if [[ ":${PATH:-}:" != *":$COMMAND_DIR:"* ]]; then
+  printf 'warning: add %s to PATH to invoke orchestrate-it-out directly\n' "$COMMAND_DIR" >&2
+fi
+printf 'Orchestrate It Out installed. Command: %s/orchestrate-it-out\n' "$COMMAND_DIR"

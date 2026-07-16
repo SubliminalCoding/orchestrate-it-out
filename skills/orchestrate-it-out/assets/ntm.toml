@@ -1,0 +1,5 @@
+# Skill-private NTM overlay for exactly five unattended Fable implementation
+# workers. Prompts are sent to exact pane indices by the outer controller.
+# Permission bypass is not OS containment and requires --trusted-task.
+[agents]
+claude = "{{memLimitPrefix}} claude --dangerously-skip-permissions{{if .Model}} --model {{shellQuote .Model}}{{end}} --effort high --no-chrome"

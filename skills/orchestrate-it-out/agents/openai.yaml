@@ -1,0 +1,4 @@
+interface:
+  display_name: "Orchestrate It Out"
+  short_description: "Sol plans five clean-repo Fables, no reviewer"
+  default_prompt: "Use $orchestrate-it-out to have GPT-5.6 Sol create a comprehensive sealed plan and then dispatch exactly five Claude Fable 5 workers with mechanically enforced completion gates and no independent post-build semantic reviewer."

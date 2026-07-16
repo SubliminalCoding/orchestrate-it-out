@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Orchestrate It Out Sol Plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "task",
+    "strategy",
+    "successDefinition",
+    "assumptions",
+    "globalInvariants",
+    "nonGoals",
+    "workers",
+    "finalVerification"
+  ],
+  "properties": {
+    "version": { "const": 1 },
+    "task": { "type": "string", "minLength": 1 },
+    "strategy": { "type": "string", "minLength": 40 },
+    "successDefinition": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "assumptions": {
+      "type": "array",
+      "maxItems": 32,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "globalInvariants": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "nonGoals": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "workers": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": { "$ref": "#/$defs/worker" }
+    },
+    "finalVerification": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 24,
+      "items": { "$ref": "#/$defs/command" }
+    }
+  },
+  "$defs": {
+    "stringList": {
+      "type": "array",
+      "maxItems": 64,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["argv", "timeoutSeconds"],
+      "properties": {
+        "argv": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 30,
+          "maximum": 3600
+        }
+      }
+    },
+    "worker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "mission",
+        "dependsOn",
+        "requiredContext",
+        "decisionsAlreadyMade",
+        "steps",
+        "writeScope",
+        "invariants",
+        "nonGoals",
+        "deliverables",
+        "acceptance",
+        "verification",
+        "parallelSafe"
+      ],
+      "properties": {
+        "id": {
+          "enum": ["fable-1", "fable-2", "fable-3", "fable-4", "fable-5"]
+        },
+        "title": { "type": "string", "minLength": 8, "maxLength": 160 },
+        "mission": { "type": "string", "minLength": 30 },
+        "dependsOn": {
+          "type": "array",
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["fable-1", "fable-2", "fable-3", "fable-4", "fable-5"]
+          }
+        },
+        "requiredContext": {
+          "allOf": [
+            { "$ref": "#/$defs/stringList" },
+            { "minItems": 1 }
+          ]
+        },
+        "decisionsAlreadyMade": {
+          "allOf": [
+            { "$ref": "#/$defs/stringList" },
+            { "minItems": 1 }
+          ]
+        },
+        "steps": {
+          "allOf": [
+            { "$ref": "#/$defs/stringList" },
+            { "minItems": 2 }
+          ]
+        },
+        "writeScope": {
+          "allOf": [
+            { "$ref": "#/$defs/stringList" },
+            { "minItems": 1 }
+          ]
+        },
+        "invariants": {
+          "allOf": [
+            { "$ref": "#/$defs/stringList" },
+            { "minItems": 1 }
+          ]
+        },
+        "nonGoals": {
+          "allOf": [
+            { "$ref": "#/$defs/stringList" },
+            { "minItems": 1 }
+          ]
+        },
+        "deliverables": {
+          "allOf": [
+            { "$ref": "#/$defs/stringList" },
+            { "minItems": 1 }
+          ]
+        },
+        "acceptance": {
+          "allOf": [
+            { "$ref": "#/$defs/stringList" },
+            { "minItems": 1 }
+          ]
+        },
+        "verification": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": { "$ref": "#/$defs/command" }
+        },
+        "parallelSafe": { "type": "boolean" }
+      }
+    }
+  }
+}

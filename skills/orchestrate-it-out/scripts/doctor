@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Read-only prerequisite and CLI-capability diagnostics.
+set -uo pipefail
+
+FAILED=0
+pass() { printf 'PASS  %s\n' "$*"; }
+warn() { printf 'WARN  %s\n' "$*"; }
+fail() { printf 'FAIL  %s\n' "$*"; FAILED=1; }
+
+check_command() {
+  if command -v "$1" >/dev/null 2>&1; then pass "$1: $(command -v "$1")"; else fail "$1 is not on PATH"; fi
+}
+
+require_flag() {
+  local label="$1" text="$2" flag="$3"
+  [[ "$text" == *"$flag"* ]] && pass "$label supports $flag" || fail "$label is missing $flag"
+}
+
+printf 'Orchestrate It Out doctor\n'
+if (( BASH_VERSINFO[0] >= 4 )); then pass "Bash $BASH_VERSION"; else fail "Bash 4+ is required"; fi
+for executable in git tmux ntm claude codex python3 timeout; do check_command "$executable"; done
+
+if command -v python3 >/dev/null 2>&1; then
+  if python3 - <<'PY'
+import fcntl
+import sys
+raise SystemExit(0 if sys.version_info >= (3, 10) else 1)
+PY
+  then pass "Python is 3.10+ with fcntl"; else fail "Python 3.10+ with fcntl is required"; fi
+fi
+
+if command -v ntm >/dev/null 2>&1; then
+  VERSION="$(ntm version 2>&1 | head -n 1 || true)"
+  if [[ "$VERSION" =~ ^ntm\ version\ ([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
+    if (( BASH_REMATCH[1] > 1 || (BASH_REMATCH[1] == 1 && BASH_REMATCH[2] > 12) || (BASH_REMATCH[1] == 1 && BASH_REMATCH[2] == 12 && BASH_REMATCH[3] >= 1) )); then
+      pass "NTM version response: $VERSION"
+    else
+      fail "NTM 1.12.1+ required; found $VERSION"
+    fi
+  else
+    fail "NTM did not return a compatible version response"
+  fi
+  HELP="$(ntm --help 2>&1 || true)"
+  SPAWN="$(ntm spawn --help 2>&1 || true)"
+  for flag in --robot-send --robot-tail --robot-wait; do require_flag "NTM" "$HELP" "$flag"; done
+  for flag in --cc --label --no-cass-context --no-hooks --no-recovery --no-user --safety; do require_flag "NTM spawn" "$SPAWN" "$flag"; done
+fi
+
+if command -v codex >/dev/null 2>&1; then
+  CODEX="$(codex exec --help 2>&1 || true)"
+  for flag in --cd --disable --ephemeral --model --output-last-message --output-schema --sandbox; do require_flag "Codex exec" "$CODEX" "$flag"; done
+fi
+
+if command -v claude >/dev/null 2>&1; then
+  CLAUDE="$(claude --help 2>&1 || true)"
+  for flag in --dangerously-skip-permissions --effort --model --no-chrome; do require_flag "Claude CLI" "$CLAUDE" "$flag"; done
+  [[ "$CLAUDE" == *"claude-fable-5"* ]] && pass "Claude CLI documents claude-fable-5" || warn "Claude CLI help does not name claude-fable-5 explicitly"
+fi
+
+printf 'INFO  orchestrator model: gpt-5.6-sol (exact pin)\n'
+printf 'INFO  five worker model: claude-fable-5 (exact pin)\n'
+warn "Authentication and model entitlement are not probed because that may contact providers"
+warn "Codex read-only sandbox health is checked only during an actual planning run"
+
+if (( FAILED == 0 )); then
+  printf 'READY prerequisites found; run ./install.sh --dry-run next.\n'
+else
+  printf 'NOT READY fix the FAIL lines before a live run.\n' >&2
+fi
+exit "$FAILED"
